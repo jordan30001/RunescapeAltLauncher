@@ -23,7 +23,7 @@ namespace RunescapeLauncher
         static void Main()
         {
             //
-            AdminChecks();
+            if(AdminChecks() == false) return;
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -41,7 +41,7 @@ namespace RunescapeLauncher
             Controller.Init();
         }
 
-        private static void AdminChecks()
+        private static bool AdminChecks()
         {
             if (!IsRunAsAdministrator())
             {
@@ -64,8 +64,10 @@ namespace RunescapeLauncher
 
                 // Shut down the current process
                 Application.Exit();
+                return false;
                 
             }
+            return true;
 
             
         }
