@@ -1,0 +1,25 @@
+{
+  "HideTitleBar": true,
+  "RelaunchClientsOnExit": true,
+  "RunescapeLauncherLocation": "C:\\ProgramData\\Jagex\\launcher\\",
+  "RunescapeLauncher": "C:\\Program Files\\Jagex\\RuneScape Launcher\\RuneScape.exe",
+  "CreateDirectoriesForMoreAccounts": true,
+  "Accounts": [
+    {
+      "World": 26,
+      "IsF2PAccount": false,
+
+      "WindowSize": [
+        775,
+        550
+      ],
+      "InitialWindowLocation": [
+        0, 0
+      ],
+      "WindowLocation": [
+        0,
+        0
+      ]
+    }
+  ]
+}
