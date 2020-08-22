@@ -295,6 +295,7 @@ namespace RunescapeLauncher
 
         public void RestartIfError()
         {
+            if (AllowShutdown) return;
             if (LauncherInformation.Rs2Client == null
                 || LauncherInformation.RunescapeLauncher == null)
             {
@@ -313,6 +314,7 @@ namespace RunescapeLauncher
 
         public void Restart()
         {
+            if (AllowShutdown) return;
             try { if (LauncherInformation.RunescapeLauncher != null) WindowUtils.KillProcessTree(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
             try { if (LauncherInformation.Rs2Client != null) WindowUtils.KillProcessTree(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
             if (LauncherInformation.Rs2Client != null)
