@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Management;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -186,6 +187,25 @@ namespace RunescapeLauncher
         {
             //EnableScrollBar(hWnd, 0x3, show);
             ShowScrollBar(hWnd, 0, show);
+        }
+
+        public static void KillProcessTree(int pid)
+        {
+            if (pid == 0) return;
+            ManagementObjectSearcher searcher = new ManagementObjectSearcher("Select * From Win32_Process Where ParentProcessID=" + pid);
+            ManagementObjectCollection moc = searcher.Get();
+            foreach (ManagementObject mo in moc)
+            {
+                KillProcessTree(Convert.ToInt32(mo["ProcessID"]));
+            }
+            try
+            {
+                Process proc = Process.GetProcessById(pid);
+                proc.Kill();
+            }
+            catch (ArgumentException)
+            {
+            }
         }
     }
 

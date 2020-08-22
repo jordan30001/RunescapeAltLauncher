@@ -221,8 +221,9 @@ namespace RunescapeLauncher
             };
         }
 
-        public static void FindUndockedClient(LauncherInformation info)
+        public static bool FindUndockedClient(LauncherInformation info)
         {
+            int tryCount = 0;
             Process[] processes;
             while (true)
             {
@@ -234,6 +235,7 @@ namespace RunescapeLauncher
                     if (CurrentProcesses.Add(curProc.Id))
                     {
                         info.RunescapeLauncher = processes[i];
+                        tryCount = 0;
                         while (true)
                         {
                             processes = Process.GetProcessesByName("rs2client");
@@ -246,13 +248,15 @@ namespace RunescapeLauncher
                                     info.Rs2Client = processes[j];
                                     curProc.Refresh();
                                     info.Hwnd = info.Rs2Client.MainWindowHandle;
-                                    return;
+                                    return true;
                                 }
                             }
+                            if (tryCount++ == 20) return false;
                             Thread.Sleep(1000);
                         }
                     }
                 }
+                if (tryCount++ == 20) return false;
                 Thread.Sleep(1000);
             }
         }

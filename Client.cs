@@ -87,7 +87,7 @@ namespace RunescapeLauncher
                         File.WriteAllText(LauncherInformation.Config.RunescapeLauncherLocation + "preferences.cfg", data);
                     }
 
-                    if(LauncherInformation.Account.InitialWindowLocation != null)
+                    if (LauncherInformation.Account.InitialWindowLocation != null)
                     {
                         int offset = 18;
                         byte[] bytes = new byte[]
@@ -113,7 +113,7 @@ namespace RunescapeLauncher
                             offset,
                             LauncherInformation.Account.InitialWindowLocation[0],
                             LauncherInformation.Account.InitialWindowLocation[1]);
-                        
+
                         string encoded = System.Convert.ToBase64String(bytes, Base64FormattingOptions.None);
 
                         RegistryInfo.SetAllClientPositionRegistryKeys(encoded);
@@ -121,9 +121,27 @@ namespace RunescapeLauncher
 
                     LauncherInformation.RunescapeLauncher.Start();
 
-                    ProcessWatcher.FindUndockedClient(LauncherInformation);
+                    bool success = ProcessWatcher.FindUndockedClient(LauncherInformation);
 
-                    DockIt(); 
+                    if (success == false)
+                    {
+                        try { if (LauncherInformation.RunescapeLauncher != null) WindowUtils.KillProcessTree(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
+                        try { if (LauncherInformation.Rs2Client != null) WindowUtils.KillProcessTree(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
+                        if (LauncherInformation.Rs2Client != null)
+                        {
+                            try { ProcessWatcher.CurrentProcesses.Remove(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
+                        }
+                        if (LauncherInformation.RunescapeLauncher != null)
+                        {
+                            try { ProcessWatcher.CurrentProcesses.Remove(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
+                        }
+                        LauncherInformation.Rs2Client = LauncherInformation.RunescapeLauncher = null;
+                        CurrentState = State.STOPPED;
+                        Locks.LauncherLockNew.ExitWriteLock();
+                        Restart();
+                    }
+
+                    DockIt();
                     return;
                 }
                 catch (Exception ex)
@@ -145,7 +163,7 @@ namespace RunescapeLauncher
             {
                 if (LauncherInformation.Rs2Client.HasExited)
                 {
-                   Locks.LauncherLockNew.ExitWriteLock();
+                    Locks.LauncherLockNew.ExitWriteLock();
                     CurrentState = State.STOPPED;
                     return;
                 }
@@ -159,7 +177,7 @@ namespace RunescapeLauncher
                 }
                 LauncherInformation.Hwnd = LauncherInformation.Rs2Client.MainWindowHandle;
                 if (LauncherInformation.Hwnd != IntPtr.Zero) break;
-                if(attempts-- == 0)
+                if (attempts-- == 0)
                 {
                     CurrentState = State.STOPPED;
                     Locks.LauncherLockNew.ExitWriteLock();
@@ -185,7 +203,7 @@ namespace RunescapeLauncher
             SetWindowSize(windowLocation, windowSize);
 
             this.FormClosing += new FormClosingEventHandler(WindowClosing);
-            CurrentState = State.RUNNING; 
+            CurrentState = State.RUNNING;
             Locks.LauncherLockNew.ExitWriteLock();
         }
 
@@ -240,7 +258,7 @@ namespace RunescapeLauncher
                 size.Height += 66;
                 IsTitleBarHidden = false;
             }
-            else if(IsTitleBarHidden == false)
+            else if (IsTitleBarHidden == false)
             {
                 this.FormBorderStyle = FormBorderStyle.None;
                 size.Height -= 66;
@@ -295,27 +313,15 @@ namespace RunescapeLauncher
 
         public void Restart()
         {
-            try
-            {
-                LauncherInformation.Rs2Client?.Kill();
-            }
-            catch (Exception  ioe)
-            {
-            }
-            try
-            {
-                LauncherInformation.RunescapeLauncher?.Kill();
-            }
-            catch (Exception ioe)
-            {
-            }
+            try { if (LauncherInformation.RunescapeLauncher != null) WindowUtils.KillProcessTree(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
+            try { if (LauncherInformation.Rs2Client != null) WindowUtils.KillProcessTree(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
             if (LauncherInformation.Rs2Client != null)
             {
                 try { ProcessWatcher.CurrentProcesses.Remove(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
             }
             if (LauncherInformation.RunescapeLauncher != null)
             {
-                try { ProcessWatcher.CurrentProcesses.Remove(LauncherInformation.RunescapeLauncher.Id); } catch(Exception ioe) { } 
+                try { ProcessWatcher.CurrentProcesses.Remove(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
             }
             LauncherInformation.Rs2Client = LauncherInformation.RunescapeLauncher = null;
             CurrentState = State.STOPPED;
@@ -325,20 +331,8 @@ namespace RunescapeLauncher
         internal void Shutdown()
         {
             this.AllowShutdown = true;
-            try
-            {
-                LauncherInformation.Rs2Client?.Kill();
-            }
-            catch (Exception ioe)
-            {
-            }
-            try
-            {
-                LauncherInformation.RunescapeLauncher?.Kill();
-            }
-            catch (Exception ioe)
-            {
-            }
+            try { WindowUtils.KillProcessTree(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
+            try { WindowUtils.KillProcessTree(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
             CurrentState = State.STOPPED;
         }
 
