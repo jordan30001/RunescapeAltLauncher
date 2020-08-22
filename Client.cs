@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -232,16 +233,20 @@ namespace RunescapeLauncher
 
         public void ShowTitleBar(bool showWindowTitleBar)
         {
-            if (showWindowTitleBar)
+            Size size = this.Size;
+            if (showWindowTitleBar && IsTitleBarHidden)
             {
                 this.FormBorderStyle = FormBorderStyle.Sizable;
+                size.Height += 66;
                 IsTitleBarHidden = false;
             }
-            else
+            else if(IsTitleBarHidden == false)
             {
                 this.FormBorderStyle = FormBorderStyle.None;
+                size.Height -= 66;
                 IsTitleBarHidden = true;
             }
+            this.Size = size;
         }
 
         public void SetWindowSize(int[] position, int[] size)
@@ -344,7 +349,5 @@ namespace RunescapeLauncher
                 ints[i].IntToBytes(ref buffer, (i * 4) + offset);
             }
         }
-
-
     }
 }
