@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Windows.Forms;
+using static RunescapeLauncher.LauncherConfig;
 
 namespace RunescapeLauncher
 {
@@ -103,7 +104,7 @@ namespace RunescapeLauncher
                 Decimal.ToInt32(numberBoxWindowY.Value)
                 }, new int[] {
                 Decimal.ToInt32(numberBoxWindowWidth.Value),
-                Decimal.ToInt32(numberBoxHeight.Value)
+                Decimal.ToInt32(numberBoxWindowHeight.Value)
                 });
             });
         }
@@ -149,6 +150,13 @@ namespace RunescapeLauncher
             {
                 buttonShowTitleBar.Text = ValueHideTitleBar;
             }
+            Account a = CurrentClient.LauncherInformation.Account;
+            numberBoxWindowX.Value = a.WindowLocation[0];
+            numberBoxWindowY.Value = a.WindowLocation[1];
+            numberBoxWindowWidth.Value = a.WindowSize[0];
+            numberBoxWindowHeight.Value = a.WindowSize[1];
+            numberBoxLaunchPositionX.Value = a.InitialWindowLocation[0];
+            numberBoxLaunchPositionY.Value = a.InitialWindowLocation[1];
         }
 
         private void buttonStartClients_Click(object sender, EventArgs e)
@@ -200,7 +208,7 @@ namespace RunescapeLauncher
 
             CurrentClient.UpdateAccount(
                                         decimal.ToInt32(numberBoxWindowX.Value), decimal.ToInt32(numberBoxWindowY.Value),
-                                        decimal.ToInt32(numberBoxWindowWidth.Value), decimal.ToInt32(numberBoxHeight.Value),
+                                        decimal.ToInt32(numberBoxWindowWidth.Value), decimal.ToInt32(numberBoxWindowHeight.Value),
                                         //decimal.ToInt32(numberBoxClientOffsetX.Value), decimal.ToInt32(numberBoxClientOffsetY.Value),
                                         //decimal.ToInt32(numberBoxClientWidth.Value), decimal.ToInt32(numberBoxClientHeight.Value),
                                         decimal.ToInt32(numberBoxLaunchPositionX.Value), decimal.ToInt32(numberBoxLaunchPositionY.Value));

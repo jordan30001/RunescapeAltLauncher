@@ -54,7 +54,7 @@
             this.label5 = new System.Windows.Forms.Label();
             this.numberBoxWindowWidth = new System.Windows.Forms.NumericUpDown();
             this.numberBoxWindowY = new System.Windows.Forms.NumericUpDown();
-            this.numberBoxHeight = new System.Windows.Forms.NumericUpDown();
+            this.numberBoxWindowHeight = new System.Windows.Forms.NumericUpDown();
             this.numberBoxWindowX = new System.Windows.Forms.NumericUpDown();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.label7 = new System.Windows.Forms.Label();
@@ -79,7 +79,7 @@
             this.groupBox2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numberBoxWindowWidth)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numberBoxWindowY)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numberBoxHeight)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numberBoxWindowHeight)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numberBoxWindowX)).BeginInit();
             this.groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numberBoxClientHeight)).BeginInit();
@@ -314,7 +314,7 @@
             this.groupBox2.Controls.Add(this.label5);
             this.groupBox2.Controls.Add(this.numberBoxWindowWidth);
             this.groupBox2.Controls.Add(this.numberBoxWindowY);
-            this.groupBox2.Controls.Add(this.numberBoxHeight);
+            this.groupBox2.Controls.Add(this.numberBoxWindowHeight);
             this.groupBox2.Controls.Add(this.numberBoxWindowX);
             this.groupBox2.Font = new System.Drawing.Font("Microsoft Sans Serif", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.groupBox2.Location = new System.Drawing.Point(13, 3);
@@ -392,16 +392,16 @@
             // 
             // numberBoxHeight
             // 
-            this.numberBoxHeight.Font = new System.Drawing.Font("Microsoft Sans Serif", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.numberBoxHeight.Location = new System.Drawing.Point(196, 60);
-            this.numberBoxHeight.Maximum = new decimal(new int[] {
+            this.numberBoxWindowHeight.Font = new System.Drawing.Font("Microsoft Sans Serif", 14F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.numberBoxWindowHeight.Location = new System.Drawing.Point(196, 60);
+            this.numberBoxWindowHeight.Maximum = new decimal(new int[] {
             10000,
             0,
             0,
             0});
-            this.numberBoxHeight.Name = "numberBoxHeight";
-            this.numberBoxHeight.Size = new System.Drawing.Size(209, 29);
-            this.numberBoxHeight.TabIndex = 1;
+            this.numberBoxWindowHeight.Name = "numberBoxHeight";
+            this.numberBoxWindowHeight.Size = new System.Drawing.Size(209, 29);
+            this.numberBoxWindowHeight.TabIndex = 1;
             // 
             // numberBoxWindowX
             // 
@@ -558,7 +558,7 @@
             this.groupBox2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numberBoxWindowWidth)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numberBoxWindowY)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.numberBoxHeight)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numberBoxWindowHeight)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numberBoxWindowX)).EndInit();
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
@@ -591,7 +591,7 @@
         private System.Windows.Forms.NumericUpDown numberBoxClientOffsetX;
         private System.Windows.Forms.NumericUpDown numberBoxWindowY;
         private System.Windows.Forms.NumericUpDown numberBoxWindowX;
-        private System.Windows.Forms.NumericUpDown numberBoxHeight;
+        private System.Windows.Forms.NumericUpDown numberBoxWindowHeight;
         private System.Windows.Forms.NumericUpDown numberBoxWindowWidth;
         private System.Windows.Forms.NumericUpDown numberBoxClientHeight;
         private System.Windows.Forms.NumericUpDown numberBoxClientWidth;
