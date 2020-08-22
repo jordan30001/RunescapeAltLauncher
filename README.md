@@ -9,14 +9,16 @@ this will allow for more than 16 different clients with all different accounts.
 
 the settings.json file contains an "Accounts" section 
 
+```
 "Accounts": [
-    {
-      "World": 26,
-      "WindowSize": [775,550],
-      "InitialWindowLocation": [0, 0],
-      "WindowLocation": [0,0]
-    }
-   ]
+  {
+    "World": 26,
+    "WindowSize": [775,550],
+    "InitialWindowLocation": [0, 0],
+    "WindowLocation": [0,0]
+  }
+ ]
+ ```
     
     
 World is self explanatory: this will attempt to launch this paticular client on world 26.
@@ -26,17 +28,19 @@ InitialWindowLocation, in most cases this can stay as 0,0 and is only used in mu
 WindowLocation self explanatory again, sets the window location of the client
 
 if you wish to add another account to launch duplicate the following json
-"
+
+```
 {
       "World": 26,
       "WindowSize": [775,550],
       "InitialWindowLocation": [0, 0],
       "WindowLocation": [0,0]
 }
-"
+```
 
 and add a comma before the last closing curly brace, moustache, right brace, whichever you prefer to call it.
 
+```
 "Accounts": [
     {
       "World": 26,
@@ -50,4 +54,5 @@ and add a comma before the last closing curly brace, moustache, right brace, whi
       "InitialWindowLocation": [0, 0],
       "WindowLocation": [0,0]
     }
-   ]
+]
+```
