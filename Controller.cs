@@ -24,6 +24,12 @@ namespace RunescapeLauncher
         private const string ValueShowAllTitleBars = "Show All Titlebars";
         private const string ValueHideAllTitleBars = "Hide All Titlebars";
 
+        private static string RootDirectory { get; } = Directory.GetCurrentDirectory() + @"\";
+
+        private static readonly Func<Account, string> GetClientSettingsFolder = account => RootDirectory + @"settings\" + account.ClientNumber + @"\";
+
+        private static readonly Func<Account, string> GetClientRunescapeSettingsFolder = account => GetClientSettingsFolder(account) + @"RuneScape\";
+
         class ClientItem
         {
             public string ClientID { get; set; }
@@ -32,6 +38,8 @@ namespace RunescapeLauncher
 
         public LauncherConfig Config { get; set; }
         public List<Client> Clients { get; } = new List<Client>();
+        private int ClientNumber = 1;
+        private int GetNextClientNumber { get { int temp = ClientNumber; ClientNumber++; return temp; } }
 
         public Client CurrentClient;
 
@@ -45,21 +53,91 @@ namespace RunescapeLauncher
         public void Init()
         {
             ProcessWatcher.Setup();
-            ProcessWatcher.Timer.Elapsed += new ElapsedEventHandler(RestartIfError);
+            bool needsSave = false;
+
+            if (Config.AccountsList.Count > 0) ClientNumber = Config.AccountsList.AsEnumerable().Max(a => a.ClientNumber) + 1;
+
+            //if (Config.CreateDirectoriesForMoreAccounts == true)
+            //{
+            for (int i = 0; i < Config.AccountsList.Count; i++)
+            {
+                Account account = Config.AccountsList[i];
+                if (account.ClientNumber == -1)
+                {
+                    account.ClientNumber = GetNextClientNumber;
+                    needsSave = true;
+                }
+                Directory.CreateDirectory(GetClientRunescapeSettingsFolder(account));
+            }
+            //}
+            List<Client> clients = new List<Client>();
+            Config.AccountsList.AsEnumerable().ForEach(account => clients.Add(CreateInternalClient(account)));
+
+            Thread.Sleep(2000);
+            clients.ForEach(client => InitInternalClient(client, true));
+
+            Config.AccountsList.Sort((a, b) => a.ClientNumber.CompareTo(b.ClientNumber));
+            if (needsSave) Config.Save();
+        }
+
+        private Client CreateInternalClient(Account account)
+        {
+            LauncherInformation li = new LauncherInformation
+            {
+                Account = account,
+                Config = Config,
+                ClientDirectory = GetClientSettingsFolder(account)
+            };
+            Client client = li.Container = new Client
+            {
+                LauncherInformation = li,
+                CurrentState = Client.State.HIDDEN
+            };
+
+            Thread thread = new Thread(() => { Thread.CurrentThread.Name = "Client Thread"; Application.Run(li.Container); });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            return li.Container;
+        }
+
+        private Client InitInternalClient(Client client, bool hidden = true, bool wait = false)
+        {
+            if (wait) Thread.Sleep(2000);
+            client.BeginInvoke(new MethodInvoker(delegate
+            {
+                LauncherInformation lf = client.LauncherInformation;
+                if (lf.Account.ClientName == null) lf.Account.ClientName = Convert.ToString(lf.Account.ClientNumber);
+                lf.Container.Init(client.LauncherInformation.Account.ClientName);
+                if (hidden) lf.Container.Hide();
+                else lf.Container.Show();
+            }));
+            return client;
         }
 
         public void AddClient(string clientID, Client client)
         {
-            Clients.Add(client);
-            ListBoxClients.Items.Add(new ClientItem() { Client = client, ClientID = clientID });
-            this.Invoke((MethodInvoker)delegate () { ListBoxClients.Refresh(); ListBoxClients.Update(); });
+            try
+            {
+                this.BeginInvoke((MethodInvoker)delegate ()
+                {
+                    Clients.Add(client);
+                    Clients.Sort((a, b) => a.LauncherInformation.Account.ClientNumber.CompareTo(b.LauncherInformation.Account.ClientNumber));
+                    ListBoxClients.Items.Clear();
+                    Clients.ForEach(c => ListBoxClients.Items.Add(new ClientItem() { Client = c, ClientID = c.LauncherInformation.Account.ClientName }));
+                    ListBoxClients.Refresh();
+                    ListBoxClients.Update();
+                });
+            }
+            catch (InvalidOperationException ioe)
+            {
+            }
         }
 
         private void RestartIfError(object sender, ElapsedEventArgs e)
         {
-            while (Locks.TryLock(ref Locks.ProccessWatcherLock) == false) Thread.Sleep(5000);
+            Locks.ProccessWatcherLockNew.EnterWriteLock();
             Clients.ForEach(c => c.RestartIfError());
-            Locks.Release(ref Locks.ProccessWatcherLock);
+            Locks.ProccessWatcherLockNew.ExitWriteLock();
         }
 
         private void buttonShutdown_Click(object sender, EventArgs e)
@@ -71,9 +149,9 @@ namespace RunescapeLauncher
         private void buttonRestartClient_Click(object sender, EventArgs e)
         {
             if (CurrentClient == null) return;
-            while (Locks.TryLock(ref Locks.ProccessWatcherLock) == false) Thread.Sleep(5000);
+            Locks.ProccessWatcherLockNew.EnterWriteLock();
             CurrentClient.Restart();
-            Locks.Release(ref Locks.ProccessWatcherLock);
+            Locks.ProccessWatcherLockNew.ExitWriteLock();
         }
 
         private void buttonClientOffset_Click(object sender, EventArgs e)
@@ -162,39 +240,25 @@ namespace RunescapeLauncher
         private void buttonStartClients_Click(object sender, EventArgs e)
         {
             buttonStartClients.Enabled = false;
-            List<LauncherInformation> clients = new List<LauncherInformation>();
 
-            string root = Directory.GetCurrentDirectory() + @"\";
-            if (Config.CreateDirectoriesForMoreAccounts == true)
+            Clients.ForEach(c =>
             {
-                for (int i = 0; i < Config.Accounts.Length; i++)
+                try
                 {
-                    Directory.CreateDirectory(root + "settings-" + i + @"\");
+                    c.CurrentState = Client.State.STOPPED;
+                    c.LauncherInformation.Container.LaunchClient();
                 }
-            }
-
-            for (int i = 0; i < Config.Accounts.Length; i++)
-            {
-                LauncherInformation li = new LauncherInformation
+                catch (ArgumentException ae)
                 {
-                    Account = Config.Accounts[i],
-                    Config = Config,
-                    ClientDirectory = root + "settings-" + i + @"\"
-                };
-                li.Container = new Client
+                    Console.WriteLine(ae.ToString());
+                }
+                catch (Exception er)
                 {
-                    LauncherInformation = li
-                };
+                    Console.WriteLine(er.ToString());
 
-                Thread thread = new Thread(() => Application.Run(li.Container));
-                thread.SetApartmentState(ApartmentState.STA);
-                thread.Start();
-
-                Thread.Sleep(5000);
-                li.Container.Invoke((MethodInvoker)delegate () { li.Container.Text = "Client: " + (i + 1); });
-                li.Container.Init("Client: " + (i + 1));
-                li.Container.Invoke((MethodInvoker)li.Container.LaunchClient);
-            }
+                }
+            });
+            //ProcessWatcher.Timer.Elapsed += new ElapsedEventHandler(RestartIfError);
         }
 
         private void buttonUpdateConfigToFile_Click(object sender, EventArgs e)
@@ -213,12 +277,123 @@ namespace RunescapeLauncher
                                         //decimal.ToInt32(numberBoxClientWidth.Value), decimal.ToInt32(numberBoxClientHeight.Value),
                                         decimal.ToInt32(numberBoxLaunchPositionX.Value), decimal.ToInt32(numberBoxLaunchPositionY.Value));
         }
+
+        private void buttonAddClient_Click(object sender, EventArgs e)
+        {
+            Locks.ClientIncrementerLock.EnterWriteLock();
+            int clientNumber = GetNextClientNumber;
+            Account account = new Account()
+            {
+                ClientName = ShowDialog("Client Name", @"Please enter the name (alpha-numeric or spaces only) of this client.
+                or nothing to set the name to the client number.", Convert.ToString(clientNumber)),
+                ClientNumber = clientNumber
+            };
+            Config.AddAccount(account);
+            Locks.ClientIncrementerLock.ExitWriteLock();
+
+            Client client = CreateInternalClient(account);
+            if (buttonStartClients.Enabled)
+            {
+                InitInternalClient(client, true, true);
+            }
+            else
+            {
+                InitInternalClient(client, false, true);
+                client.LauncherInformation.Container.LaunchClient();
+            }
+
+        }
+
+        private void buttonBatchAddClient_Click(object sender, EventArgs e)
+        {
+            FolderBrowserDialog settingsDirectory = new FolderBrowserDialog();
+            if (settingsDirectory.ShowDialog(this) == DialogResult.OK)
+            {
+                string folder = settingsDirectory.SelectedPath;
+                string[] settingFiles = Directory.GetFiles(folder, "*.jcache", SearchOption.TopDirectoryOnly);
+
+                List<Client> clients = new List<Client>();
+
+                Locks.ClientIncrementerLock.EnterWriteLock();
+                for (int i = 0; i < settingFiles.Length; i++) clients.Add(CreateInternalClient(new Account { ClientNumber = GetNextClientNumber }));
+                Locks.ClientIncrementerLock.ExitWriteLock();
+
+
+                Thread.Sleep(2000);
+                bool shouldShowWindow = buttonStartClients.Enabled == true;
+                for (int i = 0; i < clients.Count; i++)
+                {
+                    Client client = InitInternalClient(clients[i], shouldShowWindow, false);
+                    Directory.CreateDirectory(GetClientRunescapeSettingsFolder(client.LauncherInformation.Account));
+                    string destSettingsFiles = GetClientRunescapeSettingsFolder(client.LauncherInformation.Account) + "settings.jcache";
+                    File.Copy(settingFiles[i], destSettingsFiles, true);
+
+                    Config.AccountsList.Add(client.LauncherInformation.Account);
+                }
+
+                Config.Save();
+                if (buttonStartClients.Enabled == false) clients.ForEach(client => client.LaunchClient());
+            }
+        }
+
+        private static string ShowDialog(string text, string caption, string defaultValue = "")
+        {
+            Form prompt = new Form()
+            {
+                Width = 500,
+                Height = 150,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                Text = caption,
+                StartPosition = FormStartPosition.CenterScreen
+            };
+            Label textLabel = new Label() { Left = 50, Top = 20, Text = text };
+            TextBox textBox = new TextBox() { Left = 50, Top = 50, Width = 400 };
+            Button confirmation = new Button() { Text = "Ok", Left = 350, Width = 100, Top = 70, DialogResult = DialogResult.OK };
+            confirmation.Click += (sender, e) => { prompt.Close(); };
+            prompt.Controls.Add(textBox);
+            prompt.Controls.Add(confirmation);
+            prompt.Controls.Add(textLabel);
+            prompt.AcceptButton = confirmation;
+
+            string retVal = prompt.ShowDialog() == DialogResult.OK ? textBox.Text : defaultValue;
+            if (retVal.Equals("")) retVal = defaultValue;
+
+            return retVal;
+        }
+
+        private void buttonFitClientToWindow_Click(object sender, EventArgs e)
+        {
+            if (CurrentClient == null) return;
+            CurrentClient.FitClientToWindow();
+        }
+
+        private void buttonFitAllClientsToWindow_Click(object sender, EventArgs e)
+        {
+            Clients.ForEach(c => c.FitClientToWindow());
+        }
     }
 
     public static class ProcessWatcher
     {
         public static System.Timers.Timer Timer { get; set; }
         public static HashSet<int> CurrentProcesses { get; } = new HashSet<int>();
+        private static object Lock = new object();
+
+        public static bool Add(int proc)
+        {
+            while (Locks.TryLock(ref Lock) == false) Thread.Sleep(1000);
+            bool result = CurrentProcesses.Add(proc);
+            Locks.Release(ref Lock);
+            return result;
+        }
+
+        public static bool Remove(int proc)
+        {
+            while (Locks.TryLock(ref Lock) == false) Thread.Sleep(1000);
+            bool result = CurrentProcesses.Remove(proc);
+            Locks.Release(ref Lock);
+            return result;
+        }
 
         public static void Setup()
         {
@@ -240,7 +415,7 @@ namespace RunescapeLauncher
                 {
                     Process curProc = processes[i];
                     curProc.WaitForInputIdle(1000);
-                    if (CurrentProcesses.Add(curProc.Id))
+                    if (ProcessWatcher.Add(curProc.Id))
                     {
                         info.RunescapeLauncher = processes[i];
                         tryCount = 0;
@@ -251,7 +426,7 @@ namespace RunescapeLauncher
                             {
                                 curProc = processes[j];
                                 curProc.WaitForInputIdle(1000);
-                                if (CurrentProcesses.Add(curProc.Id))
+                                if (ProcessWatcher.Add(curProc.Id))
                                 {
                                     info.Rs2Client = processes[j];
                                     curProc.Refresh();

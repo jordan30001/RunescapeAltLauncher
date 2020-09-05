@@ -24,7 +24,7 @@ namespace RunescapeLauncher
         static void Main()
         {
             //
-            if(AdminChecks() == false) return;
+            if (AdminChecks() == false) return;
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -35,11 +35,14 @@ namespace RunescapeLauncher
             {
                 Config = JsonConvert.DeserializeObject<LauncherConfig>(File.ReadAllText(@"settings.json"))
             };
-            Thread thread = new Thread(() => Application.Run(Controller));
+            Controller.Config.Init();
+            Thread thread = new Thread(() =>
+            {
+                Controller.Init();
+                Application.Run(Controller);
+            });
             thread.SetApartmentState(ApartmentState.STA);
             thread.Start();
-            Thread.Sleep(5000);
-            Controller.Init();
         }
 
         private static bool AdminChecks()
@@ -66,11 +69,11 @@ namespace RunescapeLauncher
                 // Shut down the current process
                 Application.Exit();
                 return false;
-                
+
             }
             return true;
 
-            
+
         }
         private static bool IsRunAsAdministrator()
         {
@@ -189,9 +192,10 @@ namespace RunescapeLauncher
             ShowScrollBar(hWnd, 0, show);
         }
 
-        public static void KillProcessTree(int pid)
+        public static void KillProcessTree(int? pid)
         {
-            if (pid == 0) return;
+            int _pid = pid.GetValueOrDefault(0);
+            if (_pid == 0) return;
             ManagementObjectSearcher searcher = new ManagementObjectSearcher("Select * From Win32_Process Where ParentProcessID=" + pid);
             ManagementObjectCollection moc = searcher.Get();
             foreach (ManagementObject mo in moc)
@@ -200,10 +204,10 @@ namespace RunescapeLauncher
             }
             try
             {
-                Process proc = Process.GetProcessById(pid);
+                Process proc = Process.GetProcessById(_pid);
                 proc.Kill();
             }
-            catch (ArgumentException)
+            catch (Exception ae)
             {
             }
         }
@@ -211,9 +215,9 @@ namespace RunescapeLauncher
 
     public static class Locks
     {
-        public static object ProccessWatcherLock = new object();
-        public static object LauncherLock = new object();
+        public static ReaderWriterLockSlim ProccessWatcherLockNew = new ReaderWriterLockSlim();
         public static ReaderWriterLockSlim LauncherLockNew = new ReaderWriterLockSlim();
+        public static ReaderWriterLockSlim ClientIncrementerLock = new ReaderWriterLockSlim();
 
         internal static bool TryLock(ref object theLock)
         {
@@ -264,6 +268,14 @@ namespace RunescapeLauncher
             bytes[offset + 1] = (byte)(source >> 16);
             bytes[offset + 2] = (byte)(source >> 8);
             bytes[offset + 3] = (byte)(source);
+        }
+    }
+
+    public static class IEnumerableExtension
+    {
+        public static void ForEach<T>(this IEnumerable<T> enumeration, Action<T> action)
+        {
+            foreach (T item in enumeration) action(item);
         }
     }
 }

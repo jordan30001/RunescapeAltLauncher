@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Timers;
 using System.Windows.Forms;
+using static RunescapeLauncher.Controller;
 using static RunescapeLauncher.LauncherConfig;
 
 namespace RunescapeLauncher
@@ -21,8 +22,9 @@ namespace RunescapeLauncher
             InitializeComponent();
         }
 
-        private enum State
+        public enum State
         {
+            HIDDEN,
             STOPPED,
             STARTING,
             RUNNING
@@ -31,7 +33,11 @@ namespace RunescapeLauncher
         public LauncherInformation LauncherInformation { get; set; }
         public bool IsTitleBarHidden { get; set; }
         private bool AllowShutdown { get; set; }
-        private State CurrentState { get; set; }
+        public State CurrentState { get; set; }
+
+        private int TitleHeight { get; set; }
+
+        private object SelfLock = new object();
 
 
         const string RSParamsRequestOld = "http://world{0}.runescape.com/k=5/l=0/jav_config.ws?binaryType=2";
@@ -39,7 +45,8 @@ namespace RunescapeLauncher
 
         public void Init(string clientID)
         {
-            IsTitleBarHidden = LauncherInformation.Config.HideTitleBar;
+            this.Text = LauncherInformation.Account.ClientName;
+            //IsTitleBarHidden = LauncherInformation.Config.HideTitleBar;
             Program.Controller.AddClient(clientID, this);
             LocationChanged += new System.EventHandler(delegate (object sender, EventArgs e)
             {
@@ -48,50 +55,62 @@ namespace RunescapeLauncher
                 LauncherInformation.Account.WindowSize[0] = DesktopBounds.Width;
                 LauncherInformation.Account.WindowSize[1] = DesktopBounds.Height;
             });
+
+            Rectangle screenRectangle = this.RectangleToScreen(this.ClientRectangle);
+            TitleHeight = screenRectangle.Top - this.Top;
         }
 
         public void LaunchClient()
         {
-            if (CurrentState != State.STOPPED)
+            BeginInvoke((MethodInvoker)delegate
             {
-                return;
-            }
-            if (IsRunning(LauncherInformation.Rs2Client) && IsRunning(LauncherInformation.RunescapeLauncher))
-            {
-                return;
-            }
-            Locks.LauncherLockNew.EnterWriteLock();
-            CurrentState = State.STARTING;
-            while (true)
-            {
-                Process killhandle = new Process();
-                killhandle.StartInfo.FileName = @"C:\Program Files\LockHunter\Lockhunter.exe";
-                killhandle.StartInfo.Arguments = @"-d -sm -x C:\ProgramData\Jagex\launcher\instance.lock";
-                killhandle.Start();
-                killhandle.WaitForExit();
-                LauncherInformation.RunescapeLauncher = new Process();
-
-
-                try
+                Locks.LauncherLockNew.EnterWriteLock();
+                while (Locks.TryLock(ref SelfLock) == false) Thread.Sleep(1000);
+                if (CurrentState != State.STOPPED)
                 {
-                    string args = String.Join(" ", RSLaunchParams.Replace("{0}", LauncherInformation.Account.World + ""));
-                    LauncherInformation.RunescapeLauncher.StartInfo.FileName = LauncherInformation.Config.RunescapeLauncher;
-                    LauncherInformation.RunescapeLauncher.StartInfo.Arguments = args;
-                    LauncherInformation.RunescapeLauncher.StartInfo.UseShellExecute = false;
+                    Locks.Release(ref SelfLock);
+                    Locks.LauncherLockNew.ExitWriteLock();
+                    return;
+                }
+                if (IsRunning(LauncherInformation.Rs2Client) && IsRunning(LauncherInformation.RunescapeLauncher))
+                {
+                    Locks.Release(ref SelfLock);
+                    Locks.LauncherLockNew.ExitWriteLock();
+                    return;
+                }
+                CurrentState = State.STARTING;
+                this.Show();
+
+                while (true)
+                {
+                    Process killhandle = new Process();
+                    killhandle.StartInfo.FileName = @"C:\Program Files\LockHunter\Lockhunter.exe";
+                    killhandle.StartInfo.Arguments = @"-d -sm -x C:\ProgramData\Jagex\launcher\instance.lock";
+                    killhandle.Start();
+                    killhandle.WaitForExit();
+                    LauncherInformation.RunescapeLauncher = new Process();
 
 
-                    if (LauncherInformation.Config.CreateDirectoriesForMoreAccounts)
+                    try
                     {
+                        string args = String.Join(" ", RSLaunchParams.Replace("{0}", LauncherInformation.Account.World + ""));
+                        LauncherInformation.RunescapeLauncher.StartInfo.FileName = LauncherInformation.Config.RunescapeLauncher;
+                        LauncherInformation.RunescapeLauncher.StartInfo.Arguments = args;
+                        LauncherInformation.RunescapeLauncher.StartInfo.UseShellExecute = false;
+
+
+                        //if (LauncherInformation.Config.CreateDirectoriesForMoreAccounts)
+                        //{
                         string data = File.ReadAllText(LauncherInformation.Config.RunescapeLauncherLocation + "preferences.cfg");
                         data = Regex.Replace(data, "(user_folder=).+", "$1" + LauncherInformation.ClientDirectory);
                         File.WriteAllText(LauncherInformation.Config.RunescapeLauncherLocation + "preferences.cfg", data);
-                    }
+                        //}
 
-                    if (LauncherInformation.Account.InitialWindowLocation != null)
-                    {
-                        int offset = 18;
-                        byte[] bytes = new byte[]
+                        if (LauncherInformation.Account.InitialWindowLocation != null)
                         {
+                            int offset = 18;
+                            byte[] bytes = new byte[]
+                            {
                             //randon crap?
                             0b00000000, 0b00000001, 0b11111111, 0b11111111,
                             0b11111111, 0b11111111, 0b11111111, 0b11111111,
@@ -107,63 +126,67 @@ namespace RunescapeLauncher
                             0, 0, 0, 0,
                             //height (y + height)
                             0, 0, 0, 0
-                           };
-                        IntsToBytes(
-                            ref bytes,
-                            offset,
-                            LauncherInformation.Account.InitialWindowLocation[0],
-                            LauncherInformation.Account.InitialWindowLocation[1]);
+                               };
+                            IntsToBytes(
+                                ref bytes,
+                                offset,
+                                LauncherInformation.Account.InitialWindowLocation[0],
+                                LauncherInformation.Account.InitialWindowLocation[1]);
 
-                        string encoded = System.Convert.ToBase64String(bytes, Base64FormattingOptions.None);
+                            string encoded = System.Convert.ToBase64String(bytes, Base64FormattingOptions.None);
 
-                        RegistryInfo.SetAllClientPositionRegistryKeys(encoded);
-                    }
-
-                    LauncherInformation.RunescapeLauncher.Start();
-
-                    bool success = ProcessWatcher.FindUndockedClient(LauncherInformation);
-
-                    if (success == false)
-                    {
-                        try { if (LauncherInformation.RunescapeLauncher != null) WindowUtils.KillProcessTree(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
-                        try { if (LauncherInformation.Rs2Client != null) WindowUtils.KillProcessTree(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
-                        if (LauncherInformation.Rs2Client != null)
-                        {
-                            try { ProcessWatcher.CurrentProcesses.Remove(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
+                            RegistryInfo.SetAllClientPositionRegistryKeys(encoded);
                         }
-                        if (LauncherInformation.RunescapeLauncher != null)
+
+                        LauncherInformation.RunescapeLauncher.Start();
+
+                        bool success = ProcessWatcher.FindUndockedClient(LauncherInformation);
+
+                        if (success == false)
                         {
-                            try { ProcessWatcher.CurrentProcesses.Remove(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
+                            try { if (LauncherInformation.RunescapeLauncher != null) WindowUtils.KillProcessTree(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
+                            try { if (LauncherInformation.Rs2Client != null) WindowUtils.KillProcessTree(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
+                            if (LauncherInformation.Rs2Client != null)
+                            {
+                                try { ProcessWatcher.Remove(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
+                            }
+                            if (LauncherInformation.RunescapeLauncher != null)
+                            {
+                                try { ProcessWatcher.Remove(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
+                            }
+                            LauncherInformation.Rs2Client = LauncherInformation.RunescapeLauncher = null;
+                            CurrentState = State.STOPPED;
+                            Locks.LauncherLockNew.ExitWriteLock();
+                            Locks.Release(ref SelfLock);
+                            Restart();
                         }
-                        LauncherInformation.Rs2Client = LauncherInformation.RunescapeLauncher = null;
-                        CurrentState = State.STOPPED;
+                        DockIt();
                         Locks.LauncherLockNew.ExitWriteLock();
-                        Restart();
+                        Locks.Release(ref SelfLock);
+                        return;
                     }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.ToString());
+                    }
+                }
+            });
 
-                    DockIt();
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.ToString());
-                }
-            }
         }
 
-        public void DockIt()
+        private void DockIt()
         {
-            Invoke((MethodInvoker)InternalDockIt);
-        }
-
-        private void InternalDockIt()
-        {
-            int attempts = 30;
+            int attempts = 20;
             while (LauncherInformation.Hwnd == IntPtr.Zero)
             {
+                if (LauncherInformation.Rs2Client == null || LauncherInformation.RunescapeLauncher == null)
+                {
+                    CurrentState = State.STOPPED;
+                    Restart(true); 
+                    return;
+                }
                 if (LauncherInformation.Rs2Client.HasExited)
                 {
-                    Locks.LauncherLockNew.ExitWriteLock();
                     CurrentState = State.STOPPED;
                     return;
                 }
@@ -171,7 +194,6 @@ namespace RunescapeLauncher
                 LauncherInformation.Rs2Client.Refresh();
                 if (LauncherInformation.Rs2Client.HasExited)
                 {
-                    Locks.LauncherLockNew.ExitWriteLock();
                     CurrentState = State.STOPPED;
                     return;
                 }
@@ -180,8 +202,7 @@ namespace RunescapeLauncher
                 if (attempts-- == 0)
                 {
                     CurrentState = State.STOPPED;
-                    Locks.LauncherLockNew.ExitWriteLock();
-                    Restart();
+                    Restart(true);
                     return;
                 }
                 Thread.Sleep(1000);
@@ -204,7 +225,6 @@ namespace RunescapeLauncher
 
             this.FormClosing += new FormClosingEventHandler(WindowClosing);
             CurrentState = State.RUNNING;
-            Locks.LauncherLockNew.ExitWriteLock();
         }
 
         public void UpdateAccount(int wX, int wY, int wWidth, int wHeight, /*int cOffsX, int cOffsY, int cW, int cH, */int lpx, int lpy)
@@ -255,13 +275,14 @@ namespace RunescapeLauncher
             if (showWindowTitleBar && IsTitleBarHidden)
             {
                 this.FormBorderStyle = FormBorderStyle.Sizable;
-                size.Height += 66;
+                size.Height += TitleHeight;
                 IsTitleBarHidden = false;
             }
             else if (IsTitleBarHidden == false)
             {
                 this.FormBorderStyle = FormBorderStyle.None;
-                size.Height -= 66;
+
+                size.Height -= TitleHeight;
                 IsTitleBarHidden = true;
             }
             this.Size = size;
@@ -295,7 +316,6 @@ namespace RunescapeLauncher
 
         public void RestartIfError()
         {
-            if (AllowShutdown) return;
             if (LauncherInformation.Rs2Client == null
                 || LauncherInformation.RunescapeLauncher == null)
             {
@@ -312,30 +332,45 @@ namespace RunescapeLauncher
             }
         }
 
-        public void Restart()
+        public void Restart(bool force = false)
         {
+            while (Locks.TryLock(ref SelfLock) == false) Thread.Sleep(1000);
+            if (CurrentState != State.RUNNING && force == false) return;
             if (AllowShutdown) return;
             try { if (LauncherInformation.RunescapeLauncher != null) WindowUtils.KillProcessTree(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
             try { if (LauncherInformation.Rs2Client != null) WindowUtils.KillProcessTree(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
             if (LauncherInformation.Rs2Client != null)
             {
-                try { ProcessWatcher.CurrentProcesses.Remove(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
+                try { ProcessWatcher.Remove(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
             }
             if (LauncherInformation.RunescapeLauncher != null)
             {
-                try { ProcessWatcher.CurrentProcesses.Remove(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
+                try { ProcessWatcher.Remove(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
             }
             LauncherInformation.Rs2Client = LauncherInformation.RunescapeLauncher = null;
             CurrentState = State.STOPPED;
-            Invoke((MethodInvoker)LaunchClient);
+            BeginInvoke((MethodInvoker)LaunchClient);
+            Locks.Release(ref SelfLock);
         }
 
         internal void Shutdown()
         {
             this.AllowShutdown = true;
-            try { WindowUtils.KillProcessTree(LauncherInformation.RunescapeLauncher.Id); } catch (Exception ioe) { }
-            try { WindowUtils.KillProcessTree(LauncherInformation.Rs2Client.Id); } catch (Exception ioe) { }
             CurrentState = State.STOPPED;
+            try { WindowUtils.KillProcessTree(LauncherInformation?.RunescapeLauncher?.Id); } catch (Exception ioe) { }
+            try { WindowUtils.KillProcessTree(LauncherInformation?.Rs2Client?.Id); } catch (Exception ioe) { }
+        }
+
+        internal void FitClientToWindow()
+        {
+            BeginInvoke((MethodInvoker)delegate
+            {
+                int[] windowSize = LauncherInformation.Account.WindowSize;
+                int[] windowLocation = LauncherInformation.Account.WindowLocation;
+
+                WindowUtils.MakeExternalWindowBorderless(LauncherInformation.Hwnd);
+                SetWindowSize(windowLocation, windowSize);
+            });
         }
 
         public static void IntsToBytes(ref byte[] buffer, int offset, params int[] ints)
